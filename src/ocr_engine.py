@@ -96,25 +96,41 @@ class AzureOCREngine:
 
     def test_connection(self) -> Tuple[bool, str]:
         """
-        API接続テスト
+        API接続テスト（小さなテストデータで認証確認）
 
         Returns:
             (成功フラグ, メッセージ)
         """
         try:
-            # クライアントを初期化してリソース情報を取得
             client = self._get_client()
-            # 簡易的な接続確認（リストを取得）
-            client.list_analyze_results(model_id=AZURE_MODEL_ID)
+
+            # 最小限のPDFデータでテスト（1x1の白いPDF）
+            # 認証エラーがあればここで検出される
+            test_pdf = (
+                b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj "
+                b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj "
+                b"3 0 obj<</Type/Page/MediaBox[0 0 1 1]/Parent 2 0 R>>endobj "
+                b"xref\n0 4\n0000000000 65535 f \n0000000009 00000 n "
+                b"\n0000000058 00000 n \n0000000115 00000 n \n"
+                b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+            )
+
+            base64_content = base64.b64encode(test_pdf).decode('utf-8')
+            poller = client.begin_analyze_document(
+                model_id=AZURE_MODEL_ID,
+                body={"base64Source": base64_content}
+            )
+            poller.result()
+
             return True, "接続成功"
         except ClientAuthenticationError:
             return False, "認証エラー: APIキーを確認してください"
         except ServiceRequestError:
             return False, "接続エラー: ネットワークを確認してください"
         except HttpResponseError as e:
-            # 404は正常（結果がないだけ）
-            if e.status_code == 404:
-                return True, "接続成功"
-            return False, f"APIエラー: {e.message}"
+            if e.status_code == 401 or e.status_code == 403:
+                return False, "認証エラー: APIキーを確認してください"
+            # その他のエラーでも接続自体は成功している
+            return True, "接続成功"
         except Exception as e:
             return False, f"エラー: {str(e)}"
