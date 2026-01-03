@@ -1,0 +1,6 @@
+# Streamlit Web Framework
+streamlit>=1.30.0
+
+# Azure SDK
+azure-ai-documentintelligence>=1.0.0b1
+azure-core>=1.29.0
